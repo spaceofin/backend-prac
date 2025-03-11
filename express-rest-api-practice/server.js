@@ -1,5 +1,28 @@
+const Redis = require("ioredis");
 const express = require("express");
 const app = express();
+
+const redis = new Redis({
+  port: 6379,
+  host: "localhost",
+  password: process.env.REDIS_PASSWORD,
+  enableOfflineQueue: false,
+});
+
+const init = async () => {
+  await redis.flushdb();
+  await Promise.all([
+    redis.set(
+      "greets:1",
+      JSON.stringify({ id: 1, message: "Hello! Welcome!" })
+    ),
+    redis.set("greets:2", JSON.stringify({ id: 2, message: "Good Day~" })),
+    redis.set(
+      "greets:3",
+      JSON.stringify({ id: 3, message: "Have a nice day :D" })
+    ),
+  ]);
+};
 
 app.get(
   "/",
@@ -21,12 +44,33 @@ app.get("/greet", greetMiddleware, (req, res) => {
   res.status(200).send("Welcome!");
 });
 
-app.get("/greet/:username", greetMiddleware, (req, res) => {
-  res.status(200).send(`hello, ${req.params.username}`);
+app.get("/greet/:id", greetMiddleware, async (req, res) => {
+  try {
+    const key = `greets:${req.params.id}`;
+    const val = await redis.get(key);
+    const greet = JSON.parse(val);
+    res.status(200).send(greet.message);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("internal error");
+  }
 });
 
-app.listen(3000, () => {
-  console.log("Server is listening on port 3000");
+redis.once("ready", async () => {
+  try {
+    await init();
+    app.listen(3000, () => {
+      console.log("Server is listening on port 3000");
+    });
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
+});
+
+redis.on("error", (err) => {
+  console.error(err);
+  process.exit(1);
 });
 
 const errorOccurMiddleware = (req, res, next) => {
