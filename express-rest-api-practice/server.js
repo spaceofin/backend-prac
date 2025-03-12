@@ -36,6 +36,64 @@ const init = async () => {
     "greets:10",
     JSON.stringify({ id: 10, message: "Stay positive and keep shining!" })
   );
+
+  await Promise.all([
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({ id: 1, message: "Hey~ Hello! Welcome!" })
+    ),
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({ id: 2, message: "Hey~ Good Day~" })
+    ),
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({ id: 3, message: "Hey~ Have a nice day :D" })
+    ),
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({
+        id: 4,
+        message: "Hey~ Seize the day with joy and passion!",
+      })
+    ),
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({
+        id: 5,
+        message: "Hey~ Greetings from the sunny side!",
+      })
+    ),
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({
+        id: 6,
+        message: "Hey~ Wishing you all the best today!",
+      })
+    ),
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({ id: 7, message: "Hey~ Enjoy every moment of today!" })
+    ),
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({
+        id: 8,
+        message: "Hey~ Smile and have a wonderful day!",
+      })
+    ),
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({ id: 9, message: "Hey~ Make today amazing!" })
+    ),
+    redis.rpush(
+      "greets:list",
+      JSON.stringify({
+        id: 10,
+        message: "Hey~ Stay positive and keep shining!",
+      })
+    ),
+  ]);
 };
 
 app.get(
@@ -56,6 +114,50 @@ const greetMiddleware = (req, res, next) => {
 
 app.get("/greet", greetMiddleware, (req, res) => {
   res.status(200).send("Welcome!");
+});
+
+function validatePagination(offset, limit, totalGreets) {
+  if (isNaN(offset) || offset < 0 || !Number.isInteger(offset)) {
+    return {
+      error: "Invalid offset value. It must be a non-negative integer.",
+    };
+  }
+  if (isNaN(limit) || limit < 1 || !Number.isInteger(limit)) {
+    return {
+      error:
+        "Invalid limit value. It must be a positive integer greater than 0.",
+    };
+  }
+  if (offset >= totalGreets || offset + limit > totalGreets) {
+    return {
+      error: `The requested offset and limit exceed the total number of greets. Available offsets: 0 - ${
+        totalGreets - 1
+      }.`,
+    };
+  }
+  return null;
+}
+
+app.get("/greets", async (req, res) => {
+  const offset = req.query.offset ? Number(req.query.offset) : 0;
+  const limit = req.query.limit ? Number(req.query.limit) : 2;
+
+  const totalGreets = await redis.llen("greets:list");
+
+  const validationError = validatePagination(offset, limit, totalGreets);
+
+  if (validationError) {
+    return res.status(400).json(validationError);
+  }
+
+  const greetsList = await redis.lrange(
+    "greets:list",
+    offset,
+    offset + limit - 1
+  );
+  const greets = greetsList.map((greet) => JSON.parse(greet));
+
+  res.status(200).send(greets);
 });
 
 app.get("/greets/all", async (req, res) => {
