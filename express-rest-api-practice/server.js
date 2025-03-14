@@ -1,3 +1,4 @@
+const path = require("path");
 const Redis = require("ioredis");
 const express = require("express");
 const app = express();
@@ -96,6 +97,8 @@ const init = async () => {
   ]);
 };
 
+app.set("view engine", "ejs");
+
 app.get(
   "/",
   (req, res, next) => {
@@ -103,7 +106,11 @@ app.get(
     next();
   },
   (req, res) => {
-    res.status(200).send("hello world");
+    const greet = "hello world";
+    res.render(path.join(__dirname, "views", "greet.ejs"), {
+      title: "greeting",
+      greet: greet,
+    });
   }
 );
 
@@ -113,7 +120,11 @@ const greetMiddleware = (req, res, next) => {
 };
 
 app.get("/greet", greetMiddleware, (req, res) => {
-  res.status(200).send("Welcome!");
+  const greet = "Welcome!";
+  res.render(path.join(__dirname, "views", "greet.ejs"), {
+    title: "greeting",
+    greet: greet,
+  });
 });
 
 function validatePagination(offset, limit, totalGreets) {
@@ -147,7 +158,11 @@ app.get("/greets", async (req, res) => {
   const validationError = validatePagination(offset, limit, totalGreets);
 
   if (validationError) {
-    return res.status(400).json(validationError);
+    console.log(validationError.error);
+    return res.status(400).render("error.ejs", {
+      title: "error",
+      message: validationError.error,
+    });
   }
 
   const greetsList = await redis.lrange(
@@ -157,7 +172,7 @@ app.get("/greets", async (req, res) => {
   );
   const greets = greetsList.map((greet) => JSON.parse(greet));
 
-  res.status(200).send(greets);
+  res.render("greets-all.ejs", { title: "greetings", greets: greets });
 });
 
 app.get("/greets/all", async (req, res) => {
@@ -166,10 +181,17 @@ app.get("/greets/all", async (req, res) => {
     const greets = await redis.mget(keys);
     const parsedGreets = greets.map((greet) => JSON.parse(greet));
     parsedGreets.sort((a, b) => a.id - b.id);
-    res.status(200).send(parsedGreets);
+    res.render("greets-all.ejs", {
+      title: "all greetings",
+      greets: parsedGreets,
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).send("Internal error");
+    const errorMessage = "Internal error";
+    res.status(500).render("error.ejs", {
+      title: "error",
+      message: errorMessage,
+    });
   }
 });
 
@@ -189,10 +211,14 @@ app.get("/greets/all/stream", async (req, res) => {
       }
     }
     greets.sort((a, b) => a.id - b.id);
-    res.status(200).send(greets);
+    res.render("greets-all.ejs", { title: "all greetings", greets: greets });
   } catch (err) {
     console.error(err);
-    res.status(500).send("Internal error");
+    const errorMessage = "Internal error";
+    res.status(500).render("error.ejs", {
+      title: "error",
+      message: errorMessage,
+    });
   }
 });
 
@@ -201,10 +227,14 @@ app.get("/greet/:id", greetMiddleware, async (req, res) => {
     const key = `greets:${req.params.id}`;
     const val = await redis.get(key);
     const greet = JSON.parse(val);
-    res.status(200).send(greet.message);
+    res.render("greet.ejs", { title: "greeting", greet: greet });
   } catch (err) {
     console.error(err);
-    res.status(500).send("internal error");
+    const errorMessage = "Internal error";
+    res.status(500).render("error.ejs", {
+      title: "error",
+      message: errorMessage,
+    });
   }
 });
 
@@ -254,5 +284,9 @@ app.use((err, req, res, next) => {
 
 app.use((err, req, res, next) => {
   console.log(err);
-  res.status(err.status || 500).send("Internal Server Error");
+  const errorMessage = "Internal error";
+  res.status(err.status || 500).render("error.ejs", {
+    title: "error",
+    message: errorMessage,
+  });
 });
