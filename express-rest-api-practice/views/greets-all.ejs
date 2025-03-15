@@ -10,11 +10,19 @@
       <% for (const greet of greets) { %>
       <li>
         <b><%= greet.id %></b>
-        <p style="display: inline-block; margin-top: 2px; margin-bottom: 2px">
+        <p
+          class="greet-message"
+          style="
+            display: inline-block;
+            margin-top: 2px;
+            margin-bottom: 2px;
+            cursor: pointer;
+          ">
           <%= greet.message%>
         </p>
       </li>
       <% } %>
     </ul>
+    <script src="/greeting-click-event.js" defer></script>
   </body>
 </html>
