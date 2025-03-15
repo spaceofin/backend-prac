@@ -2,6 +2,7 @@ const path = require("path");
 const Redis = require("ioredis");
 const express = require("express");
 const app = express();
+const fs = require("fs");
 
 const redis = new Redis({
   port: 6379,
@@ -256,6 +257,42 @@ redis.once("ready", async () => {
 redis.on("error", (err) => {
   console.error(err);
   process.exit(1);
+});
+
+app.get("/read-buffer", (req, res) => {
+  fs.readFile(
+    path.join(__dirname, "public", "dummy-buffer.txt"),
+    (err, data) => {
+      if (err) {
+        res.status(500).send("File read error");
+        return;
+      }
+      res.send(data.toString());
+    }
+  );
+});
+
+app.get("/read-stream", (req, res) => {
+  const readStream = fs.createReadStream(
+    path.join(__dirname, "public", "dummy-stream.txt"),
+    { highWaterMark: 16 * 3 }
+  );
+
+  readStream.on("data", (chunk) => {
+    console.log("__new chunk__");
+    console.log(`${chunk}`);
+    res.write(chunk);
+  });
+
+  readStream.on("end", () => {
+    console.log("finished");
+    res.end();
+  });
+
+  readStream.on("error", (err) => {
+    console.log(`error: ${err}`);
+    res.status(500).send("File read error");
+  });
 });
 
 const errorOccurMiddleware = (req, res, next) => {
