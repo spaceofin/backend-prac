@@ -277,11 +277,15 @@ app.get("/read-stream", (req, res) => {
     path.join(__dirname, "public", "dummy-stream.txt"),
     { highWaterMark: 16 * 3 }
   );
+  const writeStream = fs.createWriteStream(
+    path.join(__dirname, "public", "write-stream.txt")
+  );
 
   readStream.on("data", (chunk) => {
     console.log("__new chunk__");
     console.log(`${chunk}`);
     res.write(chunk);
+    writeStream.write(chunk);
   });
 
   readStream.on("end", () => {
@@ -292,6 +296,22 @@ app.get("/read-stream", (req, res) => {
   readStream.on("error", (err) => {
     console.log(`error: ${err}`);
     res.status(500).send("File read error");
+  });
+});
+
+app.get("/read-stream-pipe", (req, res) => {
+  const readStream = fs.createReadStream(
+    path.join(__dirname, "public", "dummy-stream.txt"),
+    { highWaterMark: 16 * 3 }
+  );
+  const writeStream = fs.createWriteStream(
+    path.join(__dirname, "public", "write-stream-pipe.txt")
+  );
+
+  readStream.pipe(writeStream);
+
+  writeStream.on("finish", () => {
+    res.status(200).send("Stream writing completed using pipe.");
   });
 });
 
