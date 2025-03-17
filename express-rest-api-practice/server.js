@@ -3,6 +3,7 @@ const express = require("express");
 const app = express();
 const fs = require("fs");
 const { redis, init } = require("./config/redis.js");
+const router = express.Router();
 
 app.set("view engine", "ejs");
 app.use(express.static("public"));
@@ -25,8 +26,7 @@ redis.on("error", (err) => {
   process.exit(1);
 });
 
-app.get(
-  "/",
+router.route("/").get(
   (req, res, next) => {
     console.log("This is express study");
     next();
@@ -45,7 +45,7 @@ const greetMiddleware = (req, res, next) => {
   next();
 };
 
-app.get("/greet", greetMiddleware, (req, res) => {
+router.route("/greet").get(greetMiddleware, (req, res) => {
   const greet = "Welcome!";
   res.render(path.join(__dirname, "views", "greet.ejs"), {
     title: "greeting",
@@ -75,7 +75,7 @@ function validatePagination(offset, limit, totalGreets) {
   return null;
 }
 
-app.get("/greets", async (req, res) => {
+router.route("/greets").get(async (req, res) => {
   const offset = req.query.offset ? Number(req.query.offset) : 0;
   const limit = req.query.limit ? Number(req.query.limit) : 2;
 
@@ -101,7 +101,7 @@ app.get("/greets", async (req, res) => {
   res.render("greets-all.ejs", { title: "greetings", greets: greets });
 });
 
-app.get("/greets/all", async (req, res) => {
+router.route("/greets/all").get(async (req, res) => {
   try {
     const keys = await redis.keys("greets:[0-9]*");
     const greets = await redis.mget(keys);
@@ -121,7 +121,7 @@ app.get("/greets/all", async (req, res) => {
   }
 });
 
-app.get("/greets/all/stream", async (req, res) => {
+router.route("/greets/all/stream").get(async (req, res) => {
   try {
     const stream = redis.scanStream({
       match: "greets:[0-9]*",
@@ -148,7 +148,7 @@ app.get("/greets/all/stream", async (req, res) => {
   }
 });
 
-app.get("/greet/:id", greetMiddleware, async (req, res) => {
+router.route("/greet/:id").get(greetMiddleware, async (req, res) => {
   try {
     const key = `greets:${req.params.id}`;
     const val = await redis.get(key);
@@ -164,7 +164,7 @@ app.get("/greet/:id", greetMiddleware, async (req, res) => {
   }
 });
 
-app.get("/read-buffer", (req, res) => {
+router.route("/read-buffer").get((req, res) => {
   fs.readFile(
     path.join(__dirname, "public", "dummy-buffer.txt"),
     (err, data) => {
@@ -177,7 +177,7 @@ app.get("/read-buffer", (req, res) => {
   );
 });
 
-app.get("/read-stream", (req, res) => {
+router.route("/read-stream").get((req, res) => {
   const readStream = fs.createReadStream(
     path.join(__dirname, "public", "dummy-stream.txt"),
     { highWaterMark: 16 * 3 }
@@ -204,7 +204,7 @@ app.get("/read-stream", (req, res) => {
   });
 });
 
-app.get("/read-stream-pipe", (req, res) => {
+router.route("/read-stream-pipe").get((req, res) => {
   const readStream = fs.createReadStream(
     path.join(__dirname, "public", "dummy-stream.txt"),
     { highWaterMark: 16 * 3 }
@@ -225,15 +225,15 @@ const errorOccurMiddleware = (req, res, next) => {
   next(new Error("Error Occurred"));
 };
 
-app.get("/error", errorOccurMiddleware, (req, res) => {
+router.route("/error").get(errorOccurMiddleware, (req, res) => {
   res.status(200).send("This is error page");
 });
 
-app.get("/error-throw", (req, res) => {
+router.route("/error-throw").get((req, res) => {
   throw new Error("Error Thrown");
 });
 
-app.get("/not-found", (req, res, next) => {
+router.route("/not-found").get((req, res, next) => {
   const error = new Error("Sometihne went wrong!");
   error.status = 404;
   next(error);
@@ -255,3 +255,5 @@ app.use((err, req, res, next) => {
     message: errorMessage,
   });
 });
+
+app.use(router);
