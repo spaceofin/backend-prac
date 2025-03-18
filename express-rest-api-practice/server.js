@@ -1,13 +1,16 @@
-const path = require("path");
 const express = require("express");
 const app = express();
-const fs = require("fs");
-const { redis, init } = require("./config/redis.js");
+const path = require("path");
+const { redis, init } = require(path.resolve("config", "redis.js"));
 const router = express.Router();
 
 app.set("view engine", "ejs");
 app.use(express.static("public"));
 // app.use("/static", express.static(path.join(__dirname, "public")));
+
+app.use("/", require(path.resolve("routes", "greetRoutes.js")));
+app.use("/", require(path.resolve("routes", "ioRoutes.js")));
+app.use("/", require(path.resolve("routes", "errorRoutes.js")));
 
 redis.once("ready", async () => {
   try {
@@ -24,219 +27,6 @@ redis.once("ready", async () => {
 redis.on("error", (err) => {
   console.error(err);
   process.exit(1);
-});
-
-router.route("/").get(
-  (req, res, next) => {
-    console.log("This is express study");
-    next();
-  },
-  (req, res) => {
-    const greet = "hello world";
-    res.render(path.join(__dirname, "views", "greet.ejs"), {
-      title: "greeting",
-      greet: greet,
-    });
-  }
-);
-
-const greetMiddleware = (req, res, next) => {
-  console.log("This is greet route.");
-  next();
-};
-
-router.route("/greet").get(greetMiddleware, (req, res) => {
-  const greet = "Welcome!";
-  res.render(path.join(__dirname, "views", "greet.ejs"), {
-    title: "greeting",
-    greet: greet,
-  });
-});
-
-function validatePagination(offset, limit, totalGreets) {
-  if (isNaN(offset) || offset < 0 || !Number.isInteger(offset)) {
-    return {
-      error: "Invalid offset value. It must be a non-negative integer.",
-    };
-  }
-  if (isNaN(limit) || limit < 1 || !Number.isInteger(limit)) {
-    return {
-      error:
-        "Invalid limit value. It must be a positive integer greater than 0.",
-    };
-  }
-  if (offset >= totalGreets || offset + limit > totalGreets) {
-    return {
-      error: `The requested offset and limit exceed the total number of greets. Available offsets: 0 - ${
-        totalGreets - 1
-      }.`,
-    };
-  }
-  return null;
-}
-
-router.route("/greets").get(async (req, res) => {
-  const offset = req.query.offset ? Number(req.query.offset) : 0;
-  const limit = req.query.limit ? Number(req.query.limit) : 2;
-
-  const totalGreets = await redis.llen("greets:list");
-
-  const validationError = validatePagination(offset, limit, totalGreets);
-
-  if (validationError) {
-    console.log(validationError.error);
-    return res.status(400).render("error.ejs", {
-      title: "error",
-      message: validationError.error,
-    });
-  }
-
-  const greetsList = await redis.lrange(
-    "greets:list",
-    offset,
-    offset + limit - 1
-  );
-  const greets = greetsList.map((greet) => JSON.parse(greet));
-
-  res.render("greets-all.ejs", { title: "greetings", greets: greets });
-});
-
-router.route("/greets/all").get(async (req, res) => {
-  try {
-    const keys = await redis.keys("greets:[0-9]*");
-    const greets = await redis.mget(keys);
-    const parsedGreets = greets.map((greet) => JSON.parse(greet));
-    parsedGreets.sort((a, b) => a.id - b.id);
-    res.render("greets-all.ejs", {
-      title: "all greetings",
-      greets: parsedGreets,
-    });
-  } catch (err) {
-    console.error(err);
-    const errorMessage = "Internal error";
-    res.status(500).render("error.ejs", {
-      title: "error",
-      message: errorMessage,
-    });
-  }
-});
-
-router.route("/greets/all/stream").get(async (req, res) => {
-  try {
-    const stream = redis.scanStream({
-      match: "greets:[0-9]*",
-      count: 2,
-    });
-
-    const greets = [];
-    for await (const resultKeys of stream) {
-      for (const key of resultKeys) {
-        const value = await redis.get(key);
-        const greet = JSON.parse(value);
-        greets.push(greet);
-      }
-    }
-    greets.sort((a, b) => a.id - b.id);
-    res.render("greets-all.ejs", { title: "all greetings", greets: greets });
-  } catch (err) {
-    console.error(err);
-    const errorMessage = "Internal error";
-    res.status(500).render("error.ejs", {
-      title: "error",
-      message: errorMessage,
-    });
-  }
-});
-
-router.route("/greet/:id").get(greetMiddleware, async (req, res) => {
-  try {
-    const key = `greets:${req.params.id}`;
-    const val = await redis.get(key);
-    const greet = JSON.parse(val);
-    res.render("greet.ejs", { title: "greeting", greet: greet });
-  } catch (err) {
-    console.error(err);
-    const errorMessage = "Internal error";
-    res.status(500).render("error.ejs", {
-      title: "error",
-      message: errorMessage,
-    });
-  }
-});
-
-router.route("/read-buffer").get((req, res) => {
-  fs.readFile(
-    path.join(__dirname, "public", "dummy-buffer.txt"),
-    (err, data) => {
-      if (err) {
-        res.status(500).send("File read error");
-        return;
-      }
-      res.send(data.toString());
-    }
-  );
-});
-
-router.route("/read-stream").get((req, res) => {
-  const readStream = fs.createReadStream(
-    path.join(__dirname, "public", "dummy-stream.txt"),
-    { highWaterMark: 16 * 3 }
-  );
-  const writeStream = fs.createWriteStream(
-    path.join(__dirname, "public", "write-stream.txt")
-  );
-
-  readStream.on("data", (chunk) => {
-    console.log("__new chunk__");
-    console.log(`${chunk}`);
-    res.write(chunk);
-    writeStream.write(chunk);
-  });
-
-  readStream.on("end", () => {
-    console.log("finished");
-    res.end();
-  });
-
-  readStream.on("error", (err) => {
-    console.log(`error: ${err}`);
-    res.status(500).send("File read error");
-  });
-});
-
-router.route("/read-stream-pipe").get((req, res) => {
-  const readStream = fs.createReadStream(
-    path.join(__dirname, "public", "dummy-stream.txt"),
-    { highWaterMark: 16 * 3 }
-  );
-  const writeStream = fs.createWriteStream(
-    path.join(__dirname, "public", "write-stream-pipe.txt")
-  );
-
-  readStream.pipe(writeStream);
-
-  writeStream.on("finish", () => {
-    res.status(200).send("Stream writing completed using pipe.");
-  });
-});
-
-const errorOccurMiddleware = (req, res, next) => {
-  console.log("error");
-  next(new Error("Error Occurred"));
-};
-
-router.route("/error").get(errorOccurMiddleware, (req, res) => {
-  res.status(200).send("This is error page");
-});
-
-router.route("/error-throw").get((req, res) => {
-  throw new Error("Error Thrown");
-});
-
-router.route("/not-found").get((req, res, next) => {
-  const error = new Error("Sometihne went wrong!");
-  error.status = 404;
-  next(error);
 });
 
 app.use((err, req, res, next) => {
