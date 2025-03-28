@@ -3,6 +3,9 @@ const app = express();
 const path = require("path");
 const { redis, init } = require(path.resolve("config", "redis.js"));
 const router = express.Router();
+const mongoConnect = require(path.resolve("config", "mongo.js"));
+
+mongoConnect();
 
 app.set("view engine", "ejs");
 app.use(express.static("public"));
