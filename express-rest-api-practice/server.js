@@ -14,6 +14,7 @@ app.use(express.static("public"));
 app.use("/", require(path.resolve("routes", "greetRoutes.js")));
 app.use("/", require(path.resolve("routes", "ioRoutes.js")));
 app.use("/", require(path.resolve("routes", "errorRoutes.js")));
+app.use("/comments", require(path.resolve("routes", "commentsRoutes.js")));
 
 redis.once("ready", async () => {
   try {
