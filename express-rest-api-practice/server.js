@@ -15,6 +15,7 @@ app.use("/", require(path.resolve("routes", "greetRoutes.js")));
 app.use("/", require(path.resolve("routes", "ioRoutes.js")));
 app.use("/", require(path.resolve("routes", "errorRoutes.js")));
 app.use("/comments", require(path.resolve("routes", "commentsRoutes.js")));
+app.use("/movies", require(path.resolve("routes", "moviesRoutes.js")));
 
 redis.once("ready", async () => {
   try {

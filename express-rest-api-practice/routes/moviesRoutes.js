@@ -1,10 +1,10 @@
 const router = require("express").Router();
 const path = require("path");
-const Comment = require(path.resolve("models", "commentsModel.js"));
+const Movies = require(path.resolve("models", "moviesModel.js"));
 
 router.route("/").get(async (req, res) => {
-  const comments = await Comment.find();
-  res.status(200).send(comments);
+  const movies = await Movies.find();
+  res.status(200).send(movies);
 });
 
 module.exports = router;
